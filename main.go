@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 
 	sarama "github.com/Shopify/sarama"
 )
@@ -50,38 +49,41 @@ func main() {
 		}
 		partitionsConsumerList[idx] = &consumer
 	}
-	var wg sync.WaitGroup
+
+	doneChannel := make(chan struct{})
 	messageChannel := make(chan sarama.ConsumerMessage)
-	wg.Add(len(partitions))
-	signalsMain := make(chan os.Signal, 1)
-	signal.Notify(signalsMain, os.Interrupt)
+
+	runningCount := 0
 	for _, consumer := range partitionsConsumerList {
-		go readPartition(consumer, &wg, messageChannel)
+		runningCount++
+		go readPartition(consumer, doneChannel, messageChannel)
 	}
 	msgCount := 0
+
 	for {
 		select {
 		case msg := <-messageChannel:
 			fmt.Println("VALUE :", msg.Value)
 			msgCount++
-		case <-signalsMain:
-			fmt.Println("Finished reading")
-			fmt.Println("Waitnig all consumers ...")
-			fmt.Println("Msg recevied : ", msgCount)
-			wg.Wait()
-			os.Exit(0)
+		case <-doneChannel:
+			runningCount--
+			if runningCount == 0 {
+				fmt.Println("Msg recevied : ", msgCount)
+				os.Exit(0)
+			}
+
 		}
 	}
 }
 
-func readPartition(consumer *sarama.PartitionConsumer, wg *sync.WaitGroup, messageChannel chan sarama.ConsumerMessage) (int, error) {
+func readPartition(consumer *sarama.PartitionConsumer, doneChannel chan struct{}, messageChannel chan sarama.ConsumerMessage) (int, error) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
-	asyncRead(consumer, signals, wg, messageChannel)
+	asyncRead(consumer, signals, doneChannel, messageChannel)
 	return 0, nil
 }
 
-func asyncRead(consumer *sarama.PartitionConsumer, signals chan os.Signal, wg *sync.WaitGroup, messageChannel chan sarama.ConsumerMessage) {
+func asyncRead(consumer *sarama.PartitionConsumer, signals chan os.Signal, doneChannel chan struct{}, messageChannel chan sarama.ConsumerMessage) {
 	for {
 		select {
 		case err := <-(*consumer).Errors():
@@ -90,7 +92,7 @@ func asyncRead(consumer *sarama.PartitionConsumer, signals chan os.Signal, wg *s
 			messageChannel <- *msg
 		case <-signals:
 			fmt.Println("Interrupt is detected")
-			wg.Done()
+			doneChannel <- struct{}{}
 			return
 		}
 	}

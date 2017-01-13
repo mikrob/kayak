@@ -71,7 +71,6 @@ func main() {
 				fmt.Println("Msg recevied : ", msgCount)
 				os.Exit(0)
 			}
-
 		}
 	}
 }

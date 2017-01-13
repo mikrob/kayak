@@ -1,18 +1,57 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 
 	sarama "github.com/Shopify/sarama"
+	"github.com/zhuangsirui/binpacker"
 )
 
 var (
 	kafka = flag.String("b", "localhost:9092", "kafka url format IP:PORT")
 	topic = flag.String("t", "bots_events", "topic name ex : bots_events")
 )
+
+const (
+	TypeString       = 1
+	TypeInt          = 10
+	TypeUint         = 11
+	TypeFloat        = 20
+	TypeList         = 30
+	TypeMap          = 40
+	TypeBooleanTrue  = 50
+	TypeBolleanFalse = 51
+	TypeAtom         = 60
+)
+
+func getType(b byte) struct{} {
+	switch b {
+	case TypeString:
+		return string
+
+	}
+}
+
+//WokMessage represent a wok message
+type WokMessage struct {
+	binary  []byte
+	Version byte
+	Type    byte
+}
+
+func (wm *WokMessage) decodeMessage() {
+	buffer := new(bytes.Buffer)
+	packer := binpacker.NewPacker(buffer)
+	packer.PushBytes(wm.binary)
+	unpacker := binpacker.NewUnpacker(buffer)
+	unpacker.FetchByte(&wm.Version)
+	unpacker.FetchByte(&wm.Type)
+
+}
 
 func main() {
 	flag.Parse()
@@ -64,6 +103,8 @@ func main() {
 		select {
 		case msg := <-messageChannel:
 			fmt.Println("VALUE :", msg.Value)
+			wm := WokMessage{binary: msg.Value}
+			wm.decodeMessage()
 			msgCount++
 		case <-doneChannel:
 			runningCount--

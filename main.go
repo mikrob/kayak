@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"kayak/es"
 	"kayak/wok"
 	"os"
 	"os/signal"
@@ -11,8 +12,10 @@ import (
 )
 
 var (
-	kafka = flag.String("b", "localhost:9092", "kafka url format IP:PORT")
-	topic = flag.String("t", "bots_events", "topic name ex : bots_events")
+	kafka              = flag.String("b", "localhost:9092", "kafka url format IP:PORT")
+	topic              = flag.String("t", "bots_events", "topic name ex : bots_events")
+	elasticsearchURL   = flag.String("e", "http://localhost:9200", "ElasticSearch URL")
+	elasticsearchIndex = flag.String("i", "wok_message", "ElasticSearch Index Name")
 )
 
 func main() {
@@ -61,6 +64,8 @@ func main() {
 	}
 	msgCount := 0
 
+	esClient := es.NewElasticsearchClient(*elasticsearchURL, *elasticsearchIndex)
+
 	for {
 		select {
 		case msg := <-messageChannel:
@@ -68,6 +73,7 @@ func main() {
 			wm.DecodeMessage()
 			genericMessage := wm.ToGenericMessage()
 			fmt.Println(genericMessage.Stdout())
+			esClient.ForwardMessage(genericMessage)
 			msgCount++
 		case <-doneChannel:
 			runningCount--

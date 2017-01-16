@@ -2,8 +2,10 @@ package wok
 
 import (
 	"bytes"
+	"compress/zlib"
 	"errors"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/zhuangsirui/binpacker"
 )
@@ -32,6 +34,7 @@ const (
 //WType is the interface mother of all WokType
 type WType interface {
 	Decode(unpacker *binpacker.Unpacker) error
+	ToGo() interface{}
 }
 
 //DecodeValue is the generic function to read wok values
@@ -61,9 +64,9 @@ func DecodeValue(unpacker *binpacker.Unpacker) WType {
 	default:
 		return nil
 	}
-	fmt.Printf("Decoding %T...\n", wt)
+	//fmt.Printf("Decoding %T...\n", wt)
 	wt.Decode(unpacker)
-	fmt.Printf("Decoded %T %v\n", wt, wt)
+	//fmt.Printf("Decoded %T %v\n", wt, wt)
 	return wt
 
 }
@@ -79,9 +82,19 @@ func (wb *WBool) Decode(unpacker *binpacker.Unpacker) error {
 	return nil
 }
 
-//WFloat represent a woklist
+//ToGo Convert the type to go type
+func (wb *WBool) ToGo() interface{} {
+	return wb.Value
+}
+
+//WFloat represent a WokFloat
 type WFloat struct {
 	Value float64
+}
+
+//ToGo Convert the type to go type
+func (wf *WFloat) ToGo() interface{} {
+	return wf.Value
 }
 
 //Decode a float
@@ -104,9 +117,32 @@ func (wl *WList) Decode(unpacker *binpacker.Unpacker) error {
 	return nil
 }
 
+//ToStringList convert a wlist to go list
+func (wl *WList) ToStringList() []string {
+	list := make([]string, len(wl.Values))
+	for idx, val := range wl.Values {
+		list[idx] = (val.(*WBinary)).ToString()
+	}
+	return list
+}
+
+//ToGo represent go type
+func (wl *WList) ToGo() interface{} {
+	result := make([]interface{}, len(wl.Values))
+	for idx, val := range wl.Values {
+		result[idx] = val.ToGo()
+	}
+	return result
+}
+
 //WInt represent a wok int
 type WInt struct {
 	Value int64
+}
+
+//ToGo return the go value of a wok type
+func (wi *WInt) ToGo() interface{} {
+	return wi.Value
 }
 
 //Decode allow to decode a wok int into a golang int32
@@ -146,11 +182,15 @@ type WUInt struct {
 	Value uint64
 }
 
+//ToGo return the go value of a wok type
+func (wi *WUInt) ToGo() interface{} {
+	return wi.Value
+}
+
 //Decode allow to decode a wok unsigned int into a golang int32
 func (wi *WUInt) Decode(unpacker *binpacker.Unpacker) error {
 	var sizeByte byte
 	unpacker.FetchByte(&sizeByte)
-	fmt.Println("Int Byte size :", sizeByte)
 	var value uint64
 	switch sizeByte {
 	case 8:
@@ -179,6 +219,11 @@ type WBinary struct {
 	Value []byte
 }
 
+//ToGo return a WSBinary in a go string
+func (ws *WBinary) ToGo() interface{} {
+	return ws.ToString()
+}
+
 //Decode allow to decode a wok string
 func (ws *WBinary) Decode(unpacker *binpacker.Unpacker) error {
 	wt := DecodeValue(unpacker)
@@ -187,9 +232,28 @@ func (ws *WBinary) Decode(unpacker *binpacker.Unpacker) error {
 	return nil
 }
 
+//ToString convert a WBinary to a go String
+func (ws *WBinary) ToString() string {
+	return string(ws.Value)
+}
+
 //WMap represent a wok map
 type WMap struct {
 	Values map[WType]WType
+}
+
+//ToMap transform a WMAp to map<string>interface
+func (wm *WMap) ToMap() map[string]interface{} {
+	mapResult := make(map[string]interface{})
+	for key, value := range wm.Values {
+		mapResult[key.(*WBinary).ToString()] = value.ToGo()
+	}
+	return mapResult
+}
+
+//ToGo represent a WMap into a go map
+func (wm *WMap) ToGo() interface{} {
+	return wm.ToMap()
 }
 
 //Decode allow to decode a wmap
@@ -217,27 +281,87 @@ type Message struct {
 	Body      []byte
 }
 
+//UncompressBody allow to zlib uncompress the body of message
+func (m *Message) UncompressBody() {
+	r, err := zlib.NewReader(bytes.NewReader(m.Body))
+	// defer r.Close()
+	if err != nil {
+		fmt.Println("Error while zlib decompress of body", err.Error())
+		return
+	}
+	result, errCopy := ioutil.ReadAll(r)
+	if errCopy != nil {
+		fmt.Println("Error while transfering data to byte array : ", errCopy.Error())
+	}
+	r.Close()
+	m.Body = result
+}
+
+//GenericMessage represent a genericMessage
+type GenericMessage struct {
+	Version   int32
+	To        []string
+	From      string
+	UUID      string
+	Headers   map[string]interface{}
+	CRCHeader int32
+	CRCBody   int32
+	Body      string
+}
+
+//Stdout return a generic message formated for stdout
+func (gm *GenericMessage) Stdout() string {
+	return fmt.Sprintf("=================================== \nVersion : %d, To: %v, From: %s, UUID : %s, Headers : %v, CRCHeader : %d, CRCBody : %d \nBody : %s", gm.Version, gm.To, gm.From, gm.UUID, gm.Headers, gm.CRCHeader, gm.CRCBody, gm.Body)
+}
+
+//IsCompressed check if message is compressed or not
+func (m *Message) IsCompressed() bool {
+	headers := m.Headers.ToMap()
+	var compressed bool
+	for key, value := range headers {
+		if key == "compress" {
+			compressed = value.(bool)
+		}
+	}
+	return compressed
+}
+
+//ToGenericMessage convert a wokmessage into a GenericMessage
+func (m *Message) ToGenericMessage() GenericMessage {
+
+	if m.IsCompressed() {
+		m.UncompressBody()
+	}
+
+	gm := GenericMessage{
+		Version:   int32(m.Version),
+		To:        m.To.ToStringList(),
+		From:      m.From.ToString(),
+		UUID:      m.UUID.ToString(),
+		Headers:   m.Headers.ToMap(),
+		CRCHeader: m.CRCHeader,
+		CRCBody:   m.CRCBody,
+		Body:      string(m.Body),
+	}
+	return gm
+}
+
 //DecodeMessage allow to decode a message
-func (wm *Message) DecodeMessage() {
+func (m *Message) DecodeMessage() {
 	buffer := new(bytes.Buffer)
 	packer := binpacker.NewPacker(buffer)
-	packer.PushBytes(wm.Binary)
+	packer.PushBytes(m.Binary)
 	unpacker := binpacker.NewUnpacker(buffer)
-	unpacker.FetchByte(&wm.Version)
-	if wm.Version != 1 {
+	unpacker.FetchByte(&m.Version)
+	if m.Version != 1 {
 		fmt.Println("Not a wok message")
 	} else {
-		wm.To = *DecodeValue(unpacker).(*WList)
-		wm.From = *DecodeValue(unpacker).(*WBinary)
-		wm.UUID = *DecodeValue(unpacker).(*WBinary)
-		wm.Headers = *DecodeValue(unpacker).(*WMap)
-		unpacker.FetchInt32(&wm.CRCHeader)
-		unpacker.FetchInt32(&wm.CRCBody)
-		body := make([]byte, len(wm.Binary))
-		n, err := buffer.Read(body)
-		if err != nil {
-			fmt.Println("Error while reading body in buffer")
-		}
-		wm.Body = body[0:n]
+		m.To = *DecodeValue(unpacker).(*WList)
+		m.From = *DecodeValue(unpacker).(*WBinary)
+		m.UUID = *DecodeValue(unpacker).(*WBinary)
+		m.Headers = *DecodeValue(unpacker).(*WMap)
+		unpacker.FetchInt32(&m.CRCHeader)
+		unpacker.FetchInt32(&m.CRCBody)
+		m.Body = DecodeValue(unpacker).(*WBinary).Value
 	}
 }

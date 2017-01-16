@@ -64,9 +64,10 @@ func main() {
 	for {
 		select {
 		case msg := <-messageChannel:
-			fmt.Println("VALUE :", msg.Value)
 			wm := wok.Message{Binary: msg.Value}
 			wm.DecodeMessage()
+			genericMessage := wm.ToGenericMessage()
+			fmt.Println(genericMessage.Stdout())
 			msgCount++
 		case <-doneChannel:
 			runningCount--

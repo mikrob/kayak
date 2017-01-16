@@ -65,8 +65,8 @@ func main() {
 		select {
 		case msg := <-messageChannel:
 			fmt.Println("VALUE :", msg.Value)
-			wm := wok.WokMessage{binary: msg.Value}
-			wm.decodeMessage()
+			wm := wok.Message{Binary: msg.Value}
+			wm.DecodeMessage()
 			msgCount++
 		case <-doneChannel:
 			runningCount--

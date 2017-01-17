@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"github.com/zhuangsirui/binpacker"
 )
@@ -279,6 +280,7 @@ type Message struct {
 	CRCHeader int32
 	CRCBody   int32
 	Body      []byte
+	Timestamp time.Time
 }
 
 //UncompressBody allow to zlib uncompress the body of message
@@ -307,6 +309,7 @@ type GenericMessage struct {
 	CRCHeader int32
 	CRCBody   int32
 	Body      string
+	Timestamp time.Time
 }
 
 //Stdout return a generic message formated for stdout
@@ -342,6 +345,7 @@ func (m *Message) ToGenericMessage() GenericMessage {
 		CRCHeader: m.CRCHeader,
 		CRCBody:   m.CRCBody,
 		Body:      string(m.Body),
+		Timestamp: m.Timestamp,
 	}
 	return gm
 }
@@ -363,5 +367,6 @@ func (m *Message) DecodeMessage() {
 		unpacker.FetchInt32(&m.CRCHeader)
 		unpacker.FetchInt32(&m.CRCBody)
 		m.Body = DecodeValue(unpacker).(*WBinary).Value
+		m.Timestamp = time.Now()
 	}
 }

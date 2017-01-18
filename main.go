@@ -4,9 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"kayak/es"
-	"kayak/wok"
 	"os"
 	"os/signal"
+
+	"gitlab.botsunit.com/msaas/wok-go/wok"
 
 	sarama "github.com/Shopify/sarama"
 )

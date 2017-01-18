@@ -2,7 +2,9 @@ package es
 
 import (
 	"fmt"
-	"kayak/wok"
+
+	"gitlab.botsunit.com/msaas/wok-go/wok"
+
 	"time"
 
 	"gopkg.in/olivere/elastic.v3"

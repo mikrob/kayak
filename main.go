@@ -16,10 +16,16 @@ var (
 	topic              = flag.String("t", "bots_events", "topic name ex : bots_events")
 	elasticsearchURL   = flag.String("e", "http://localhost:9200", "ElasticSearch URL")
 	elasticsearchIndex = flag.String("i", "wok_message", "ElasticSearch Index Name")
+	versionFlag        = flag.Bool("version", false, "Print version of the program")
+	version            string
 )
 
 func main() {
 	flag.Parse()
+	if *versionFlag {
+		fmt.Println("Kayak Version ", version)
+		os.Exit(0)
+	}
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
 

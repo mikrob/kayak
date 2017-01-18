@@ -15,4 +15,4 @@ image:
 	rm -f id_rsa_jenkins
 
 all:
-	go build -ldflags "-X main.version=`git describe --tags`" -o ${BINARY} main.go
+	go build -ldflags "-X main.version=`git describe --tags`" -o ${BINARY}-`git describe --tags` main.go

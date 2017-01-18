@@ -26,6 +26,7 @@ func NewElasticsearchClient(URL string, index string) ElasticsearchClient {
 	// Create a client
 	client, err := elastic.NewClient()
 	elastic.SetMaxRetries(10)
+	fmt.Println("Sending message to ES : ", URL)
 	elastic.SetURL(URL)
 	if err != nil {
 		fmt.Println("Error while initializing Elasticsearch client : ", err.Error())
@@ -41,6 +42,7 @@ func (ESClient *ElasticsearchClient) ForwardMessage(m wok.GenericMessage) {
 		ESClient.ESIndex = logstashIndex()
 	}
 
+	fmt.Println("Sending to Index : ", ESClient.ESIndex)
 	ESClient.Client.Index().
 		Index(ESClient.ESIndex).
 		Type("wok_message").
@@ -48,4 +50,5 @@ func (ESClient *ElasticsearchClient) ForwardMessage(m wok.GenericMessage) {
 		BodyJson(m).
 		Refresh(true).
 		Do()
+	fmt.Println("Sent")
 }

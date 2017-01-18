@@ -1,0 +1,9 @@
+package: kayak
+import:
+- package: github.com/Shopify/sarama
+- package: gitlab.botsunit.com/msaas/wok-go
+  repo: git@gitlab.botsunit.com:msaas/wok-go
+  vcs: git
+  subpackages:
+  - wok
+- package: gopkg.in/olivere/elastic.v3

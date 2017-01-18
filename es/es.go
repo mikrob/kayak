@@ -46,7 +46,6 @@ func (ESClient *ElasticsearchClient) ForwardMessage(m wok.GenericMessage) {
 	ESClient.Client.Index().
 		Index(ESClient.ESIndex).
 		Type("wok_message").
-		Id(m.UUID).
 		BodyJson(m).
 		Refresh(true).
 		Do()

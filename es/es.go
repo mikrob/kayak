@@ -10,6 +10,12 @@ import (
 	"gopkg.in/olivere/elastic.v3"
 )
 
+const (
+	//ElasticsearchType designate the type put in messages
+	ElasticsearchType     = "wok_message"
+	logstashIndexWildcard = "logstash-*"
+)
+
 //ElasticsearchClient represent an ElasticsearchClient
 type ElasticsearchClient struct {
 	Client  *elastic.Client
@@ -45,7 +51,7 @@ func (ESClient *ElasticsearchClient) ForwardMessage(m wok.GenericMessage) {
 	fmt.Println("Sending to Index : ", ESClient.ESIndex)
 	ESClient.Client.Index().
 		Index(ESClient.ESIndex).
-		Type("wok_message").
+		Type(ElasticsearchType).
 		BodyJson(m).
 		Do()
 	fmt.Println("Sent")

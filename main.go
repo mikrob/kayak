@@ -15,10 +15,12 @@ import (
 var (
 	kafka              = flag.String("b", "localhost:9092", "kafka url format IP:PORT")
 	topic              = flag.String("t", "bots_events", "topic name ex : bots_events")
+	offset             = flag.String("o", "new", "offset to leave from new for newest, old for oldest")
 	elasticsearchURL   = flag.String("e", "http://localhost:9200", "ElasticSearch URL")
 	elasticsearchIndex = flag.String("i", "wok_message", "ElasticSearch Index Name")
 	versionFlag        = flag.Bool("version", false, "Print version of the program")
 	version            string
+	offsetChoosen      int64
 )
 
 func main() {
@@ -27,26 +29,36 @@ func main() {
 		fmt.Println("Kayak Version ", version)
 		os.Exit(0)
 	}
+	if *offset == "new" {
+		offsetChoosen = sarama.OffsetNewest
+	} else {
+		offsetChoosen = sarama.OffsetOldest
+	}
 	config := sarama.NewConfig()
 	config.Consumer.Return.Errors = true
-
 	// Specify brokers address. This is default one
 	brokers := []string{*kafka}
 
+	client, err := sarama.NewClient(brokers, config)
+	if err != nil {
+		panic(err)
+	}
+	mainConsumer, err := sarama.NewConsumerFromClient(client)
 	// Create new consumer
-	master, err := sarama.NewConsumer(brokers, config)
+	//master, err := sarama.NewConsumer(brokers, config)
+
 	if err != nil {
 		panic(err)
 	}
 
 	defer func() {
-		if errClose := master.Close(); err != nil {
+		if errClose := mainConsumer.Close(); err != nil {
 			panic(errClose)
 		}
 	}()
 
 	fmt.Println("Listing partitions ...")
-	partitions, errPart := master.Partitions(*topic)
+	partitions, errPart := mainConsumer.Partitions(*topic)
 	if errPart != nil {
 		panic(errPart)
 	}
@@ -54,7 +66,7 @@ func main() {
 
 	partitionsConsumerList := make([]*sarama.PartitionConsumer, len(partitions))
 	for idx, part := range partitions {
-		consumer, err := master.ConsumePartition(*topic, part, sarama.OffsetOldest)
+		consumer, err := mainConsumer.ConsumePartition(*topic, part, offsetChoosen)
 		if err != nil {
 			panic(err)
 		}
@@ -78,7 +90,7 @@ func main() {
 		case msg := <-messageChannel:
 			wm := wok.Message{Binary: msg.Value}
 			wm.DecodeMessage()
-			genericMessage := wm.ToGenericMessage()
+			genericMessage := wm.ToGenericMessage(msg.Offset, msg.Partition)
 			fmt.Println(genericMessage.Stdout())
 			esClient.ForwardMessage(genericMessage)
 			msgCount++

@@ -1,5 +1,5 @@
 hash: 9d0bcceec682e98e031ca8a14a18a7fd2dd048b0531cac1d366b99ecaf777509
-updated: 2017-01-18T19:35:23.682755076+01:00
+updated: 2017-01-19T11:12:26.24595518+01:00
 imports:
 - name: github.com/davecgh/go-spew
   version: 346938d642f2ec3594ed81d874461961cd0faa76
@@ -30,7 +30,7 @@ imports:
 - name: github.com/zhuangsirui/binpacker
   version: 5a43297a7406274fbb3b722cd28453aa0715abf6
 - name: gitlab.botsunit.com/msaas/wok-go
-  version: b7a0982def0655bd25d2db35125e048698069c9b
+  version: 69ac8fed9732ea83a4d2fd4584590d1673c27bcc
   repo: git@gitlab.botsunit.com:msaas/wok-go
   vcs: git
   subpackages:
